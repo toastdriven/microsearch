@@ -3,7 +3,7 @@ from distutils.core import setup
 setup(
     name = "microsearch",
     version = "0.1.0",
-    description = "A small search engine.",
+    description = "A small search library.",
     author = 'Daniel Lindsley',
     author_email = 'daniel@toastdriven.com',
     long_description=open('README', 'r').read(),

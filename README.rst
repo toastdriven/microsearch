@@ -3,7 +3,12 @@ microsearch
 ===========
 
 
-A small search engine.
+A small search library.
+
+Primarily intended to be a learning tool to teach the fundamentals of search.
+
+Useful for embedding into Python apps where you don't want/need something
+as complex as Lucene.
 
 
 Requirements
