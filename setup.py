@@ -6,7 +6,7 @@ setup(
     description = "A small search library.",
     author = 'Daniel Lindsley',
     author_email = 'daniel@toastdriven.com',
-    long_description=open('README', 'r').read(),
+    long_description=open('README.rst', 'r').read(),
     py_modules = [
         'microsearch'
     ],
