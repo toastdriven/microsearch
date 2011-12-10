@@ -16,7 +16,7 @@ Requirements
 
 * Python 2.6+ or Python 3.2+
 * (Optional) simplejson
-* (Optional) unittest2 (for runnning the tests)
+* (Optional) unittest2 (Python 2.6 - for runnning the tests)
 
 
 Running Tests
@@ -24,7 +24,13 @@ Running Tests
 
 With a source checkout, run:
 
+In Python 2:
+
     python -m unittest2 tests
+
+In Python 3:
+
+    python -m unittest tests
 
 Tests should be passing at all times under both Python 2.7 & Python 3.2.
 

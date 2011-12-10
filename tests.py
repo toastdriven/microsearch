@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
-import unittest2
+import unittest
 import microsearch
 
 
-class EnglishTokenizerTestCase(unittest2.TestCase):
+class EnglishTokenizerTestCase(unittest.TestCase):
     def test_init(self):
         et = microsearch.EnglishTokenizer('Hello world!')
         self.assertEqual(et.text, 'hello world!')
@@ -23,7 +23,7 @@ class EnglishTokenizerTestCase(unittest2.TestCase):
         self.assertEqual(list(et), ['hello', 'world', 'i\'m', 'like', 'totally', 'happy', 'meet', 'you', 'it\'s', 'my', 'pleasure', 'come', 'sit', 'fire'])
 
 
-class EdgeNgramGeneratorTestCase(unittest2.TestCase):
+class EdgeNgramGeneratorTestCase(unittest.TestCase):
     def test_simple_init(self):
         eng = microsearch.EdgeNgramGenerator('Hello')
         self.assertEqual(eng.token, 'Hello')
