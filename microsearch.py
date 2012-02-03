@@ -2,7 +2,9 @@
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import hashlib
 import os
+import shutil
 
 try:
     import simplejson as json
@@ -17,6 +19,11 @@ __version__ = (0, 1, 0)
 
 FRONT = 'front'
 BACK = 'back'
+
+
+class MicrosearchError(Exception): pass
+class DataError(MicrosearchError): pass
+class NoDocumentError(MicrosearchError): pass
 
 
 class EnglishTokenizer(object):
@@ -96,3 +103,93 @@ class EdgeNgramGenerator(object):
 
         return grams
 
+
+class HashedWriter(object):
+    def __init__(self, base_directory, hash_length=6, read_mode='r', write_mode='w', extension='txt'):
+        self.base_directory = base_directory
+        self.hash_length = hash_length
+        self.read_mode = read_mode
+        self.write_mode = write_mode
+        self.extension = extension
+
+    def check_filesystem(self, path=None):
+        if not os.path.exists(self.base_directory):
+            os.makedirs(self.base_directory)
+
+        if path:
+            if not os.path.exists(path):
+                os.makedirs(path)
+
+        return True
+
+    def generate_path(self, filename):
+        # We hash the doc_id to ensure that there are
+        # never too many files in a directory.
+        md5 = hashlib.md5(filename).hexdigest()[:self.hash_length]
+        filename = "{0}.{1}".format(filename, self.extension)
+        return [os.path.join(self.base_directory, md5), filename]
+
+    def filepath(self, filename):
+        path, filename = self.generate_path(filename)
+        self.check_filesystem(path)
+        return os.path.join(path, filename)
+
+    def load(self, filename):
+        hf_filepath = self.filepath(filename)
+
+        try:
+            with open(hf_filepath, self.read_mode) as hf_file:
+                return hf_file.read()
+        except IOError as e:
+            raise NoDocumentError("Couldn't load '%s': %s" % (hf_filepath, e))
+
+    def save(self, filename, data):
+        hf_filepath = self.filepath(filename)
+
+        with open(hf_filepath, self.write_mode) as hf_file:
+            hf_file.write(data)
+
+        return True
+
+    def delete(self, filename):
+        hf_filepath = self.filepath(filename)
+
+        try:
+            os.unlink(hf_filepath)
+        except OSError as e:
+            raise NoDocumentError("Couldn't delete '%s': %s" % (hf_filepath, e))
+
+        return True
+
+
+class Document(object):
+    def __init__(self, base_directory, doc_id, data=None, default_field='text', writer=None):
+        self.base_directory = os.path.join(base_directory, 'docs')
+        self.doc_id = doc_id
+        self.data = data or {}
+        self.default_field = default_field
+        self.writer = writer
+
+        if not self.writer:
+            self.writer = HashedWriter(base_directory, extension='json')
+
+        if len(self.data) and not default_field in self.data:
+            raise DataError("The default field '%s' is not present in the provided data." % self.default_field)
+
+    def load(self):
+        data = self.writer.load(self.doc_id)
+        self.data = json.loads(data)
+        return self
+
+    def save(self):
+        return self.writer.save(self.doc_id, json.dumps(self.data))
+
+    def delete(self):
+        return self.writer.delete(self.doc_id)
+
+
+# TODO:
+# * Index object
+#   * Segment object
+#   * Query object
+#   * QueryParser object
