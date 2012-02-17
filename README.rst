@@ -14,9 +14,9 @@ as complex as Lucene.
 Requirements
 ============
 
-* Python 2.6+ or Python 3.2+
+* Python 2.5+ or Python 3.2+
 * (Optional) simplejson
-* (Optional) unittest2 (Python 2.6 - for runnning the tests)
+* (Optional) unittest2 (Python 2.5 - for runnning the tests)
 
 
 Running Tests
@@ -52,4 +52,4 @@ requirements are met.
 
 
 :author: Daniel Lindsley <daniel@toastdriven.com>
-:date: 2011/12/10
+:date: 2011/02/16

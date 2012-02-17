@@ -115,7 +115,9 @@ class HashedWriterTestCase(unittest.TestCase):
         hf_writer = microsearch.HashedWriter(os.path.join(self.base, 'test'))
         hf_writer.save('abc', 'Goodbye cruel world.')
         self.assertTrue(os.path.exists('/tmp/hashedwriter/test/900150/abc.txt'))
-        self.assertEqual(open('/tmp/hashedwriter/test/900150/abc.txt', 'r').read(), 'Goodbye cruel world.')
+
+        with open('/tmp/hashedwriter/test/900150/abc.txt', 'r') as hf_file:
+            self.assertEqual(hf_file.read(), 'Goodbye cruel world.')
 
     def test_delete(self):
         os.makedirs('/tmp/hashedwriter/test/900150')
@@ -157,7 +159,9 @@ class DocumentTestCase(unittest.TestCase):
         doc = microsearch.Document(self.base, 'abc', data={"text": "Goodbye cruel world.", "count": 5})
         doc.save()
         self.assertTrue(os.path.exists(path))
-        self.assertEqual(open(path, 'r').read(), '{"count": 5, "text": "Goodbye cruel world."}')
+
+        with open(path, 'r') as doc_file:
+            self.assertEqual(doc_file.read(), '{"count": 5, "text": "Goodbye cruel world."}')
 
     def test_delete(self):
         directory = os.path.join(self.base, '900150')
@@ -172,3 +176,127 @@ class DocumentTestCase(unittest.TestCase):
 
         doc = microsearch.Document(self.base, 'ab')
         self.assertRaises(microsearch.NoDocumentError, doc.delete)
+
+
+class IndexTestCase(unittest.TestCase):
+    def setUp(self):
+        super(IndexTestCase, self).setUp()
+        self.base = '/tmp/microsearch/index'
+
+    def tearDown(self):
+        shutil.rmtree(self.base, ignore_errors=True)
+        super(IndexTestCase, self).tearDown()
+
+    def test_load(self):
+        index = microsearch.Index(self.base)
+        self.assertEqual(index.data, {})
+        self.assertEqual(index._loaded, False)
+        index.check_filesystem()
+
+        with open(index.filepath, 'w') as raw_index_file:
+            raw_index_file.write('hello\t{"abc": [5, 12], "bcd": [1], "ghi": [75, 83, 202]}\n')
+            raw_index_file.write('search\t{"xyz": [1, 16]}\n')
+
+        index.load()
+        self.assertEqual(index.data, {'search': {'xyz': [1, 16]}, 'hello': {'bcd': [1], 'abc': [5, 12], 'ghi': [75, 83, 202]}})
+        self.assertEqual(index._loaded, True)
+
+    def test_save(self):
+        index = microsearch.Index(self.base)
+        index.data = {'document': {'abc': [4, 16], 'bcd': [1, 5]}, 'search': {'abc': [7]}}
+        index._dirty = True
+        index.save()
+
+        with open(index.filepath) as raw_index_file:
+            raw_index = raw_index_file.read()
+            self.assertEqual(raw_index, 'document\t{"bcd": [1, 5], "abc": [4, 16]}\nsearch\t{"abc": [7]}\n')
+
+    def test_delete(self):
+        index = microsearch.Index(self.base)
+        index.data = {'document': {'abc': [4, 16], 'bcd': [1, 5]}, 'search': {'abc': [7]}}
+        index._dirty = True
+        index.save()
+
+        self.assertTrue(os.path.exists(index.filepath))
+
+        index.delete()
+        self.assertFalse(os.path.exists(index.filepath))
+
+    def test_update(self):
+        index = microsearch.Index(self.base)
+
+        # Write a couple.
+        index.update('document', 'abc', 5)
+        index.update('search', 'abc', 3)
+        index.update('document', 'bcd', 12)
+
+        self.assertEqual(index._dirty, True)
+        self.assertEqual(index.data, {
+            'search': {
+                'abc': [3]
+            },
+            'document': {
+                'bcd': [12],
+                'abc': [5]
+            }
+        })
+
+        index.save()
+
+        with open(index.filepath) as raw_index_file:
+            raw_index = raw_index_file.read()
+            self.assertEqual(raw_index, 'document\t{"bcd": [12], "abc": [5]}\nsearch\t{"abc": [3]}\n')
+
+    def test_get(self):
+        index = microsearch.Index(self.base)
+
+        # Write a couple.
+        index.update('document', 'abc', 5)
+        index.update('search', 'abc', 3)
+        index.update('document', 'bcd', 12)
+        index.save()
+
+        self.assertEqual(index.get('document'), {'bcd': [12], 'abc': [5]})
+        self.assertEqual(index.get('search'), {'abc': [3]})
+        self.assertEqual(index.get('pony'), {})
+
+    def test_remove(self):
+        index = microsearch.Index(self.base)
+
+        # Write a couple.
+        index.update('document', 'abc', 5)
+        index.update('search', 'abc', 3)
+        index.update('document', 'bcd', 12)
+        index.save()
+
+        # Remove one.
+        index.remove('document', 'abc', 5)
+        self.assertEqual(index.data, {'search': {'abc': [3]}, 'document': {'bcd': [12]}})
+
+        # Remove the other.
+        index.remove('document', 'bcd', 12)
+        self.assertEqual(index.data, {'search': {'abc': [3]}})
+
+        index.update('document', 'abc', 5)
+        index.update('search', 'abc', 3)
+        index.update('document', 'bcd', 12)
+        index.save()
+
+        # Remove the document.
+        index.remove('document', 'bcd')
+        self.assertEqual(index.data, {'search': {'abc': [3]}, 'document': {'abc': [5]}})
+
+        # Remove non-existent.
+        index.remove('search', 'bcd')
+        self.assertEqual(index.data, {'search': {'abc': [3]}, 'document': {'abc': [5]}})
+
+        # Remove the whole term.
+        index.remove('document')
+        self.assertEqual(index.data, {'search': {'abc': [3]}})
+
+        index.remove('search')
+        self.assertEqual(index.data, {})
+
+        # Remove non-existent term
+        index.remove('foo')
+        self.assertEqual(index.data, {})

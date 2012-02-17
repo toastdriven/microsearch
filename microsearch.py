@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 import hashlib
 import os
 import shutil
+import tempfile
 
 try:
     import simplejson as json
@@ -14,7 +15,7 @@ except ImportError:
 
 __author__ = 'Daniel Lindsley'
 __license__ = 'BSD'
-__version__ = (0, 1, 0)
+__version__ = (0, 2, 0)
 
 
 FRONT = 'front'
@@ -125,7 +126,7 @@ class HashedWriter(object):
     def generate_path(self, filename):
         # We hash the doc_id to ensure that there are
         # never too many files in a directory.
-        md5 = hashlib.md5(filename).hexdigest()[:self.hash_length]
+        md5 = hashlib.md5(filename.encode('ascii', errors='ignore')).hexdigest()[:self.hash_length]
         filename = "{0}.{1}".format(filename, self.extension)
         return [os.path.join(self.base_directory, md5), filename]
 
@@ -188,8 +189,162 @@ class Document(object):
         return self.writer.delete(self.doc_id)
 
 
+class Index(object):
+    """
+    TBD.
+
+    Data format is structured like::
+
+        <term>\t<JSON-encoded dictionary of document names, with position lists as values>\n
+
+    Sample data looks like::
+
+        hello\t{'abc': [5, 12], 'bcd': [1], 'ghi': [75, 83, 202]}\n
+    """
+    def __init__(self, base_directory, name='main'):
+        self.base_directory = os.path.join(base_directory, 'index')
+        self.name = name
+        self.filepath = os.path.join(self.base_directory, name)
+        self.data = {}
+        self._loaded = False
+        self._dirty = False
+
+    def check_filesystem(self):
+        if not os.path.exists(self.base_directory):
+            os.makedirs(self.base_directory)
+
+        return True
+
+    def parse_record(self, record):
+        return record.rstrip().split('\t', 1)
+
+    def parse_term_info(self, raw_term_info):
+        return json.loads(raw_term_info)
+
+    def build_record(self, term, term_info):
+        return "{0}\t{1}\n".format(term, self.build_term_info(term_info))
+
+    def build_term_info(self, term_info):
+        return json.dumps(term_info)
+
+    def load(self):
+        self.check_filesystem()
+
+        if not os.path.exists(self.filepath):
+            self.data = {}
+            self._loaded = True
+            return True
+
+        with open(self.filepath, 'r') as index_file:
+            for line in index_file:
+                term, term_info = self.parse_record(line)
+                self.data[term] = self.parse_term_info(term_info)
+
+        self._loaded = True
+        self._dirty = False
+        return True
+
+    def save(self):
+        # If we haven't been modified, just return.
+        if not self._dirty:
+            return False
+
+        self.check_filesystem()
+
+        # Write a tempfile & move it into place once it's done.
+        # FIXME: Eventually, some locking may be needed.
+        new_index = tempfile.NamedTemporaryFile(mode='w', delete=False)
+
+        for term in sorted(self.data.keys()):
+            new_index.write(self.build_record(term, self.data[term]))
+
+        new_index.close()
+        shutil.move(new_index.name, self.filepath)
+        self._dirty = False
+        return True
+
+    def delete(self):
+        try:
+            os.unlink(self.filepath)
+        except OSError:
+            pass
+
+        self._dirty = True
+        return True
+
+    def check_term(self, term, document_name=None):
+        if not self._loaded:
+            self.load()
+
+        self.data.setdefault(term, {})
+
+        if document_name:
+            self.data[term].setdefault(document_name, [])
+
+        return True
+
+    def cleanup_term(self, term, document_name=None):
+        if document_name and not len(self.data[term][document_name]):
+            del(self.data[term][document_name])
+
+        if not len(self.data[term]):
+            del(self.data[term])
+
+        return True
+
+    def get(self, term):
+        if not self._loaded:
+            self.load()
+
+        return self.data.get(term, {})
+
+    def update(self, term, document_name, position):
+        self.check_term(term, document_name)
+
+        if not position in self.data[term][document_name]:
+            self.data[term][document_name] = sorted(self.data[term][document_name] + [position])
+
+        self._dirty = True
+        return True
+
+    def remove(self, term, document_name=None, position=None):
+        self.check_term(term, document_name)
+
+        # Just a specific position.
+        if document_name is not None and position is not None:
+            try:
+                offset = self.data[term][document_name].index(position)
+                self.data[term][document_name].pop(offset)
+                self.cleanup_term(term, document_name)
+            except ValueError:
+                return False
+
+            self._dirty = True
+            return True
+
+        # Just remove a document.
+        if document_name is not None:
+            try:
+                del(self.data[term][document_name])
+                self.cleanup_term(term)
+            except KeyError:
+                return False
+
+            self._dirty = True
+            return True
+
+        # Remove the whole term.
+        try:
+            del(self.data[term])
+        except KeyError:
+            return False
+
+        self._dirty = True
+        return True
+
+
+
 # TODO:
 # * Index object
-#   * Segment object
 #   * Query object
 #   * QueryParser object
