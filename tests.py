@@ -314,7 +314,8 @@ class BM25RelevanceTestCase(unittest.TestCase):
             'hello': 3,
         }
         total_docs = 17
-        self.assertAlmostEqual(bm25.calculate(terms, matching_docs, current_doc_occurances, total_docs), 0.5)
+        bm25_relevance = bm25.calculate(terms, matching_docs, current_doc_occurances, total_docs)
+        self.assertEqual("{:.2f}".format(bm25_relevance), '0.56')
 
         terms = ['hello']
         matching_docs = {
@@ -324,7 +325,8 @@ class BM25RelevanceTestCase(unittest.TestCase):
             'hello': 5,
         }
         total_docs = 175
-        self.assertAlmostEqual(bm25.calculate(terms, matching_docs, current_doc_occurances, total_docs), 0.6397323070026185)
+        bm25_relevance = bm25.calculate(terms, matching_docs, current_doc_occurances, total_docs)
+        self.assertEqual("{:.2f}".format(bm25_relevance), '0.64')
 
         terms = ['hello', 'world']
         matching_docs = {
@@ -336,4 +338,5 @@ class BM25RelevanceTestCase(unittest.TestCase):
             'world': 3,
         }
         total_docs = 175
-        self.assertAlmostEqual(bm25.calculate(terms, matching_docs, current_doc_occurances, total_docs), 0.679625629230611)
+        bm25_relevance = bm25.calculate(terms, matching_docs, current_doc_occurances, total_docs)
+        self.assertEqual("{:.2f}".format(bm25_relevance), '0.68')
