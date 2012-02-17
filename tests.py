@@ -172,3 +172,74 @@ class DocumentTestCase(unittest.TestCase):
 
         doc = microsearch.Document(self.base, 'ab')
         self.assertRaises(microsearch.NoDocumentError, doc.delete)
+
+
+class SegmentTestCase(unittest.TestCase):
+    def setUp(self):
+        super(SegmentTestCase, self).setUp()
+        self.base = '/tmp/microsearch/segments'
+
+    def tearDown(self):
+        shutil.rmtree(self.base, ignore_errors=True)
+        super(SegmentTestCase, self).tearDown()
+
+    def test_update(self):
+        seg = microsearch.Segment(self.base)
+
+        # Write a couple.
+        seg.update('document', 'abc', 5)
+        seg.update('search', 'abc', 3)
+        seg.update('document', 'bcd', 12)
+
+        raw_doc_segfile = open(seg.filepath('document')).read()
+        raw_search_segfile = open(seg.filepath('document')).read()
+        self.assertEqual(raw_doc_segfile, '')
+        self.assertEqual(raw_search_segfile, '')
+
+    def test_get(self):
+        seg = microsearch.Segment(self.base)
+
+        # Write a couple.
+        seg.update('document', 'abc', 5)
+        seg.update('search', 'abc', 3)
+        seg.update('document', 'bcd', 12)
+
+        self.assertEqual(seg.get('document'), '')
+        self.assertEqual(seg.get('search'), '')
+        self.assertEqual(seg.get('pony'), '')
+
+    def test_remove(self, term, document_name, position):
+        seg = microsearch.Segment(self.base)
+
+        # Write a couple.
+        seg.update('document', 'abc', 5)
+        seg.update('search', 'abc', 3)
+        seg.update('document', 'bcd', 12)
+
+        # Remove one.
+        seg.remove('document', 'abc', 5)
+        raw_doc_segfile = open(seg.filepath('document')).read()
+        self.assertEqual(raw_doc_segfile, '')
+
+        # Remove the other.
+        seg.remove('document', 'bcd', 12)
+        raw_doc_segfile = open(seg.filepath('document')).read()
+        self.assertEqual(raw_doc_segfile, '')
+
+        # Remove non-existent.
+        seg.remove('document', 'bcd', 12)
+        raw_doc_segfile = open(seg.filepath('document')).read()
+        self.assertEqual(raw_doc_segfile, '')
+
+    def test_delete(self):
+        seg = microsearch.Segment(self.base)
+
+        # Write a couple.
+        seg.update('document', 'abc', 5)
+        seg.update('search', 'abc', 3)
+        seg.update('document', 'bcd', 12)
+
+        seg.delete('document')
+        raw_doc_segfile = open(seg.filepath('document')).read()
+        self.assertEqual(raw_doc_segfile, '')
+

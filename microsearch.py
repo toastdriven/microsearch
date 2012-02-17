@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 import hashlib
 import os
 import shutil
+import tempfile
 
 try:
     import simplejson as json
@@ -188,8 +189,136 @@ class Document(object):
         return self.writer.delete(self.doc_id)
 
 
+class Segment(HashedWriter):
+    """
+    TBD.
+
+    Data format is structured like::
+
+        <term>\x0a<JSON-encoded dictionary of document names, with position lists as values>\n
+
+    Sample data looks like::
+
+        hello\x0a{'abc': [5, 12], 'bcd': [1], 'ghi': [75, 83, 202]}\n
+    """
+    def __init__(self, base_directory, **kwargs):
+        kwargs.update({
+            'write_mode': 'a',
+            'extension': 'index',
+        })
+        super(Segment, self).__init__(base_directory, **kwargs)
+
+    def parse_record(self, record):
+        return record.split('\x0a', 1).rstrip()
+
+    def parse_term_info(self, raw_term_info):
+        return json.loads(raw_term_info)
+
+    def build_record(self, term, term_info):
+        return "{0}\x0a{1}\n".format(term, self.build_term_info(term_info))
+
+    def build_term_info(self, term_info):
+        return json.dumps(term_info)
+
+    def _rewrite_file(self, func, term, *args):
+        # FIXME: This needs some sort of locking to make sure multiple
+        # threads/processes aren't trying to update at the same time.
+        seg_filepath = self.filepath(term)
+
+        try:
+            seg_file = open(seg_filepath, self.read_mode)
+        except IOError as e:
+            # raise NoDocumentError("Couldn't load '%s': %s" % (seg_filepath, e))
+            seg_file = []
+
+        new_index = tempfile.NamedTemporaryFile(mode='w', delete=False)
+
+        for line in seg_file:
+            current_term, raw_term_info = self.parse_record(line)
+
+            if current_term != term:
+                # Do nothing & just write it.
+                new_index.write(line)
+                continue
+
+            # Call the specialized method & write the record.
+            record = func(current_term, raw_term_info, *args)
+
+            if record:
+                new_index.write(record)
+
+        # Move the file into place.
+        new_index.close()
+        shutil.move(new_index.name, seg_filepath)
+        return True
+
+    def _update_term(self, term, raw_term_info, document_name, position):
+        # We've got a match. Return the document/position info.
+        current_term_info = self.parse_term_info(raw_term_info)
+        current_term_info.setdefault(document_name, [])
+
+        if not position in current_term_info[document_name]:
+            current_term_info[document_name].append(position)
+            current_term_info[document_name] = sorted(current_term_info[document_name])
+
+        # Write the record.
+        return self.build_record(term, current_term_info)
+
+    def _remove_from_term(self, term, raw_term_info, document_name, position):
+        # We've got a match. Return the document/position info.
+        current_term_info = self.parse_term_info(raw_term_info)
+        current_term_info.setdefault(document_name, [])
+
+        if not position in current_term_info[document_name]:
+            current_term_info[document_name].remove(position)
+
+        if not len(current_term_info[document_name]):
+            # No positions left for that document. Nuke it.
+            del current_term_info[document_name]
+
+        if not len(current_term_info):
+            # No documents left for that term. Nuke the whole term.
+            return None
+
+        # Write the record.
+        return self.build_record(term, current_term_info)
+
+    def _delete_term(self, term, raw_term_info):
+        # This one is easy-peasy. Since we don't want the term at all, just
+        # return ``None`` so the record doesn't get written at all.
+        return None
+
+    def get(self, term):
+        seg_filepath = self.filepath(term)
+
+        try:
+            seg_file = open(seg_filepath, self.read_mode)
+        except IOError as e:
+            raise NoDocumentError("Couldn't load '%s': %s" % (seg_filepath, e))
+
+        for line in seg_file:
+            current_term, raw_term_info = self.parse_record(line)
+
+            if current_term == term:
+                # We've got a match. Return the document/position info.
+                seg_file.close()
+                return self.parse_term_info(raw_term_info)
+
+        seg_file.close()
+        return None
+
+    def update(self, term, document_name, position):
+        return self._rewrite_file(self._update_term, term, document_name, position)
+
+    def remove(self, term, document_name, position):
+        return self._rewrite_file(self._remove_from_term, term, document_name, position)
+
+    def delete(self, term):
+        return self._rewrite_file(self._delete_term, term)
+
+
+
 # TODO:
 # * Index object
-#   * Segment object
 #   * Query object
 #   * QueryParser object
