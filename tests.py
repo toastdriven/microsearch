@@ -300,3 +300,40 @@ class IndexTestCase(unittest.TestCase):
         # Remove non-existent term
         index.remove('foo')
         self.assertEqual(index.data, {})
+
+
+class BM25RelevanceTestCase(unittest.TestCase):
+    def test_calculations(self):
+        bm25 = microsearch.BM25Relevance()
+
+        terms = ['hello']
+        matching_docs = {
+            'hello': 7,
+        }
+        current_doc_occurances = {
+            'hello': 3,
+        }
+        total_docs = 17
+        self.assertAlmostEqual(bm25.calculate(terms, matching_docs, current_doc_occurances, total_docs), 0.5)
+
+        terms = ['hello']
+        matching_docs = {
+            'hello': 25,
+        }
+        current_doc_occurances = {
+            'hello': 5,
+        }
+        total_docs = 175
+        self.assertAlmostEqual(bm25.calculate(terms, matching_docs, current_doc_occurances, total_docs), 0.6397323070026185)
+
+        terms = ['hello', 'world']
+        matching_docs = {
+            'hello': 25,
+            'world': 7,
+        }
+        current_doc_occurances = {
+            'hello': 5,
+            'world': 3,
+        }
+        total_docs = 175
+        self.assertAlmostEqual(bm25.calculate(terms, matching_docs, current_doc_occurances, total_docs), 0.679625629230611)

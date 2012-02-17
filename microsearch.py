@@ -3,6 +3,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import hashlib
+import math
 import os
 import shutil
 import tempfile
@@ -343,8 +344,22 @@ class Index(object):
         return True
 
 
+class BM25Relevance(object):
+    # Average document length
+    b = 0
+    k = 1.2
+
+    # More or less taken from http://sphinxsearch.com/blog/2010/08/17/how-sphinx-relevance-ranking-works/...
+    def calculate(self, terms, matching_docs, current_doc_occurances, total_docs):
+        score = self.b
+
+        for term in terms:
+            inverse_doc_freq = math.log((total_docs - matching_docs[term] + 1) / matching_docs[term]) / math.log(1.0 + total_docs)
+            score = score + current_doc_occurances[term] * inverse_doc_freq / (current_doc_occurances[term] + self.k)
+
+        return 0.5 + score / (2 * len(terms))
+
 
 # TODO:
-# * Index object
 #   * Query object
 #   * QueryParser object
