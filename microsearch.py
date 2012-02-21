@@ -202,6 +202,9 @@ class Index(object):
 
         hello\t{'abc': [5, 12], 'bcd': [1], 'ghi': [75, 83, 202]}\n
     """
+    # FIXME: This loads everything into RAM, which is bad.
+    #        Turning this back into ``Segment``, using hashing of terms to
+    #        select the segment & reading from disk would likely be better.
     def __init__(self, base_directory, name='main'):
         self.base_directory = os.path.join(base_directory, 'index')
         self.name = name
@@ -357,7 +360,59 @@ class BM25Relevance(object):
             inverse_doc_freq = math.log((total_docs - matching_docs[term] + 1) / matching_docs[term]) / math.log(1.0 + total_docs)
             score = score + current_doc_occurances[term] * inverse_doc_freq / (current_doc_occurances[term] + self.k)
 
-        return 0.5 + score / (2 * len(terms))
+        return 0.5 + score / (2.0 * len(terms))
+
+
+class SimpleQuery(object):
+    def __init__(self, tokenizer_class=EnglishTokenizer, term_class=EdgeNgramGenerator):
+        self.tokenizer_class = tokenizer_class
+        self.term_class = term_class
+
+    def parse(self, query):
+        # All terms are considered "AND". No basic/advanced logic, just terms.
+        terms = []
+
+        for token in self.tokenizer_class(query):
+            term_gen = self.term_class(token)
+            terms.append(term_gen.run())
+
+        return terms
+
+    def search(self, terms):
+        pass
+
+
+
+class Microsearch(object):
+    index_class = Index
+    document_class = Document
+    tokenizer_class = EnglishTokenizer
+    term_class = EdgeNgramGenerator
+    query_class = SimpleQuery
+
+    def __init__(self, base_directory):
+        self.base_directory = base_directory
+        self.index = self.index_class(self.base_directory)
+
+    def index(self, document_id, document):
+        # Generate the tokens/positions.
+        # Generate the terms.
+        # Index the terms/document_id/positions.
+        # Stow the document.
+        pass
+
+    def delete(self, document_id):
+        pass
+
+    def search(self, query, start=0, end=20):
+        # Generate the tokens.
+        # Generate the terms.
+        # Fetch the relevant terms/documents.
+        # Assign relevance.
+        # Reorder & return the results.
+        pass
+
+
 
 
 # TODO:
