@@ -209,7 +209,7 @@ class MicrosearchTestCase(unittest.TestCase):
         self.assertTrue(os.path.exists(raw_index))
 
         # Should load the correct term data.
-        self.assertEqual(self.micro.load_segment('hello'), {u'abc': [1, 5], u'bcd': [3, 4]})
+        self.assertEqual(self.micro.load_segment('hello'), {'abc': [1, 5], 'bcd': [3, 4]})
 
         # Won't hash to the same file & since we didn't put the data there,
         # it fails to lookup.
@@ -228,8 +228,8 @@ class MicrosearchTestCase(unittest.TestCase):
         self.assertTrue(os.path.exists(raw_index))
 
         # Should load the correct term data.
-        self.assertEqual(self.unhashed_micro.load_segment('hello'), {u'abc': [1, 5], u'bcd': [3, 4]})
-        self.assertEqual(self.unhashed_micro.load_segment('hell'), {u'ab': [2]})
+        self.assertEqual(self.unhashed_micro.load_segment('hello'), {'abc': [1, 5], 'bcd': [3, 4]})
+        self.assertEqual(self.unhashed_micro.load_segment('hell'), {'ab': [2]})
         self.assertEqual(self.unhashed_micro.load_segment('zeta'), {"efg": [1, 3]})
 
         # Term miss.
@@ -264,7 +264,7 @@ class MicrosearchTestCase(unittest.TestCase):
         self.assertTrue(os.path.exists(raw_doc))
 
         # Should load the correct document data.
-        self.assertEqual(self.micro.load_document('hello'), {u'abc': [1, 5], u'bcd': [3, 4]})
+        self.assertEqual(self.micro.load_document('hello'), {'abc': [1, 5], 'bcd': [3, 4]})
 
     def test_index(self):
         # Check the exceptions.
@@ -304,6 +304,8 @@ class MicrosearchTestCase(unittest.TestCase):
             self.assertEqual(lines[19], 'desk\t{"email_1": [9, 16]}\n')
             self.assertEqual(lines[74], 'report\t{"email_3": [12], "email_1": [7]}\n')
 
+        self.assertEqual(self.micro.get_total_docs(), 4)
+
     def test_parse_query(self):
         self.assertEqual(self.micro.parse_query('Hello world!'), {
             'hel': [0],
@@ -324,9 +326,9 @@ class MicrosearchTestCase(unittest.TestCase):
         self.assertTrue(os.path.exists(raw_index))
 
         # Should load the correct term data.
-        self.assertEqual(self.unhashed_micro.collect_results(['hello']), {'hello': {u'bcd': [3, 4], u'abc': [1, 5]}})
-        self.assertEqual(self.unhashed_micro.collect_results(['hell']), {'hell': {u'ab': [2]}})
-        self.assertEqual(self.unhashed_micro.collect_results(['zeta', 'alpha', 'foo']), {'alpha': {u'efg': [9, 10]}, 'foo': {}, 'zeta': {u'efg': [1, 3]}})
+        self.assertEqual(self.unhashed_micro.collect_results(['hello']), ({'hello': 2}, {'bcd': {'hello': 2}, 'abc': {'hello': 2}}))
+        self.assertEqual(self.unhashed_micro.collect_results(['hell']), ({'hell': 1}, {'ab': {'hell': 1}}))
+        self.assertEqual(self.unhashed_micro.collect_results(['zeta', 'alpha', 'foo']), ({'alpha': 1, 'zeta': 1, 'foo': 0}, {'efg': {'alpha': 2, 'zeta': 2}}))
 
     def test_bm25_relevance(self):
         terms = ['hello']
@@ -363,6 +365,30 @@ class MicrosearchTestCase(unittest.TestCase):
         total_docs = 175
         relevance = self.micro.bm25_relevance(terms, matching_docs, current_doc_occurances, total_docs)
         self.assertEqual("{:.2f}".format(relevance), '0.68', 'This fails on 2.X but should pass on Python 3.')
+
+    def test_search(self):
+        # No query, no results.
+        self.assertEqual(self.micro.search(''), [])
+
+        # Query, but no documents.
+        self.assertEqual(self.micro.search('hello'), [])
+
+        # Index some data.
+        self.micro.index('email_1', {'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh"})
+        self.micro.index('email_2', {'text': 'Everyone,\n\nM-m-m-m-my red stapler has gone missing. H-h-has a-an-anyone seen it?\n\nMilton'})
+        self.micro.index('email_3', {'text': "Peter,\n\nYeah, I'm going to need you to come in on Saturday. Don't forget those reports.\n\nLumbergh"})
+        self.micro.index('email_4', {'text': 'How do you feel about becoming Management?\n\nThe Bobs'})
+
+        # Single term queries.
+        self.assertEqual(self.micro.search('peter'), [{'text': "Peter,\n\nYeah, I'm going to need you to come in on Saturday. Don't forget those reports.\n\nLumbergh", 'score': 0.5572567355483165, 'id': 'email_3'}, {'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh", 'score': 0.5572567355483165, 'id': 'email_1'}])
+        self.assertEqual(self.micro.search('desk'), [{'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh", 'score': 0.7691728487958707, 'id': 'email_1'}])
+        self.assertEqual(self.micro.search('you'), [{'text': "Peter,\n\nYeah, I'm going to need you to come in on Saturday. Don't forget those reports.\n\nLumbergh", 'score': 0.44274326445168355, 'id': 'email_3'}, {'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh", 'score': 0.44274326445168355, 'id': 'email_1'}, {'text': 'How do you feel about becoming Management?\n\nThe Bobs', 'score': 0.44274326445168355, 'id': 'email_4'}])
+
+        # No matches:
+        self.assertEqual(self.micro.search('wunderkind'), [])
+
+        # Multiple term queries.
+        self.assertEqual(self.micro.search('peter desk'), [{'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh", 'score': 0.6420231808473381, 'id': 'email_1'}, {'text': "Peter,\n\nYeah, I'm going to need you to come in on Saturday. Don't forget those reports.\n\nLumbergh", 'score': 0.5343540413289899, 'id': 'email_3'}])
 
 
 if __name__ == '__main__':

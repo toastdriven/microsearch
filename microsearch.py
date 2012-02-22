@@ -186,7 +186,7 @@ class Microsearch(object):
         return line.rstrip().split('\t', 1)
 
     def make_record(self, term, term_info):
-        return "{0}\t{1}\n".format(term, json.dumps(term_info))
+        return "{0}\t{1}\n".format(term, json.dumps(term_info, ensure_ascii=False))
 
     def update_term_info(self, orig_info, new_info):
         # Updates are (sadly) not as simple as ``dict.update()``.
@@ -222,7 +222,7 @@ class Microsearch(object):
                 if not written and seg_term > term:
                     # We're at the alphabetical location & need to insert.
                     new_line = self.make_record(term, term_info)
-                    new_seg_file.write(new_line)
+                    new_seg_file.write(new_line.encode('utf-8'))
                     written = True
                 elif seg_term == term:
                     if not update:
@@ -237,11 +237,11 @@ class Microsearch(object):
 
                 # Either we haven't reached it alphabetically or we're well-past.
                 # Write the line.
-                new_seg_file.write(line)
+                new_seg_file.write(line.encode('utf-8'))
 
             if not written:
                 line = self.make_record(term, term_info)
-                new_seg_file.write(line)
+                new_seg_file.write(line.encode('utf-8'))
 
         # Atomically move it into place.
         new_seg_file.close()
@@ -314,6 +314,7 @@ class Microsearch(object):
         for term, positions in terms.items():
             self.save_segment(term, {doc_id: positions}, update=True)
 
+        self.increment_total_docs()
         return True
 
 
@@ -326,22 +327,63 @@ class Microsearch(object):
         return self.make_ngrams(tokens)
 
     def collect_results(self, terms):
-        matches = {}
+        per_term_docs = {}
+        per_doc_counts = {}
 
         for term in terms:
-            matches[term] = self.load_segment(term)
+            term_matches = self.load_segment(term)
 
-        return matches
+            per_term_docs.setdefault(term, 0)
+            per_term_docs[term] += len(term_matches.keys())
 
-    def bm25_relevance(self, terms, matches, current_docs, total_docs, b=0, k=1.2):
+            for doc_id, positions in term_matches.items():
+                per_doc_counts.setdefault(doc_id, {})
+                per_doc_counts[doc_id].setdefault(term, 0)
+                per_doc_counts[doc_id][term] += len(positions)
+
+        return per_term_docs, per_doc_counts
+
+    def bm25_relevance(self, terms, matches, current_doc, total_docs, b=0, k=1.2):
+        # More or less borrowed from http://sphinxsearch.com/blog/2010/08/17/how-sphinx-relevance-ranking-works/.
         score = b
 
         for term in terms:
-            idf = math.log((total_docs - matches[term] + 1) / matches[term]) / math.log(1.0 + total_docs)
-            score = score + current_docs[term] * idf / (current_docs[term] + k)
+            idf = math.log((total_docs - matches[term] + 1.0) / matches[term]) / math.log(1.0 + total_docs)
+            score = score + current_doc.get(term, 0) * idf / (current_doc.get(term, 0) + k)
 
         return 0.5 + score / (2 * len(terms))
 
-    def search(self, query):
+    def search(self, query, offset=0, limit=20):
+        if not len(query):
+            return []
+
+        total_docs = self.get_total_docs()
+
+        if total_docs == 0:
+            return []
+
         terms = self.parse_query(query)
-        results = self.collect_results(terms)
+        per_term_docs, per_doc_counts = self.collect_results(terms)
+        scored_results = []
+        final_results = []
+
+        # Score the results per document.
+        for doc_id, current_doc in per_doc_counts.items():
+            scored_results.append({
+                'id': doc_id,
+                'score': self.bm25_relevance(terms, per_term_docs, current_doc, total_docs),
+            })
+
+        # Sort based on score.
+        sorted_results = sorted(scored_results, key=lambda res: res['score'], reverse=True)
+
+        # Slice the results.
+        sliced_results = sorted_results[offset:offset + limit]
+
+        # For each result, load up the doc & update the dict.
+        for res in sliced_results:
+            doc_dict = self.load_document(res['id'])
+            doc_dict.update(res)
+            final_results.append(doc_dict)
+
+        return final_results
