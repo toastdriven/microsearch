@@ -185,8 +185,54 @@ class Microsearch(object):
 
         return {}
 
+
+    # =================
+    # Document Handling
+    # =================
+
+    def make_document_name(self, doc_id):
+        # Builds a path like ``BASE_DIR/documents/5d4140/hello.json``.
+        return os.path.join(self.docs_path, self.hash_name(doc_id), "{0}.json".format(doc_id))
+
+    def save_document(self, doc_id, document):
+        doc_path = self.make_document_name(doc_id)
+        base_path = os.path.dirname(doc_path)
+
+        if not os.path.exists(base_path):
+            os.makedirs(base_path)
+
+        with open(doc_path, 'w') as doc_file:
+            doc_file.write(json.dumps(document, ensure_ascii=False))
+
+        return True
+
+    def load_document(self, doc_id):
+        doc_path = self.make_document_name(doc_id)
+
+        with open(doc_path, 'r') as doc_file:
+            data = json.loads(doc_file.read())
+
+        return data
+
+
     def index(self, doc_id, document):
-        pass
+        # Ensure that the ``document`` looks like a dictionary.
+        if not hasattr(document, 'items'):
+            raise AttributeError('You must provide `index` with a document in the form of a dictionary.')
+
+        # For example purposes, we only index the ``text`` field.
+        if not 'text' in document:
+            raise KeyError('You must provide `index` with a document with a `text` field in it.')
+
+        # Make sure the document ID is a string.
+        doc_id = str(doc_id)
+        save_document(doc_id, document)
+
+        # Start analysis & indexing.
+        tokens = self.make_tokens(document.get('text', ''))
+        terms = self.make_ngrams(tokens)
+
+        # FIXME: Continue here.
 
 
     # =========

@@ -173,6 +173,37 @@ class MicrosearchTestCase(unittest.TestCase):
         # Term miss.
         self.assertEqual(self.unhashed_micro.load_segment('binary'), {})
 
+    def test_make_document_name(self):
+        self.assertEqual(self.micro.make_document_name('hello'), '/tmp/microsearch_tests/documents/5d4140/hello.json')
+        self.assertEqual(self.micro.make_document_name('world'), '/tmp/microsearch_tests/documents/7d7930/world.json')
+        self.assertEqual(self.micro.make_document_name('truly'), '/tmp/microsearch_tests/documents/f499b3/truly.json')
+        self.assertEqual(self.micro.make_document_name('splendid'), '/tmp/microsearch_tests/documents/291e4e/splendid.json')
+        self.assertEqual(self.micro.make_document_name('example'), '/tmp/microsearch_tests/documents/1a79a4/example.json')
+        self.assertEqual(self.micro.make_document_name('some'), '/tmp/microsearch_tests/documents/03d59e/some.json')
+
+    def test_save_document(self):
+        raw_doc = self.micro.make_document_name('hello')
+        self.assertFalse(os.path.exists(raw_doc))
+
+        self.assertTrue(self.micro.save_document('hello', {'abc': [1, 5]}))
+        self.assertTrue(os.path.exists(raw_doc))
+
+        with open(raw_doc, 'r') as raw_doc_file:
+            self.assertEqual(raw_doc_file.read(), '{"abc": [1, 5]}')
+
+    def test_load_document(self):
+        raw_doc = self.micro.make_document_name('hello')
+        self.assertFalse(os.path.exists(raw_doc))
+        os.makedirs(os.path.dirname(raw_doc))
+
+        with open(raw_doc, 'w') as raw_doc_file:
+            raw_doc_file.write('{"bcd": [3, 4], "abc": [1, 5]}\n')
+
+        self.assertTrue(os.path.exists(raw_doc))
+
+        # Should load the correct document data.
+        self.assertEqual(self.micro.load_document('hello'), {u'abc': [1, 5], u'bcd': [3, 4]})
+
     def test_parse_query(self):
         self.assertEqual(self.micro.parse_query('Hello world!'), {
             'hel': [0],
@@ -184,7 +215,18 @@ class MicrosearchTestCase(unittest.TestCase):
         })
 
     def test_collect_results(self):
-        pass
+        raw_index = self.unhashed_micro.make_segment_name('hello')
+        self.assertFalse(os.path.exists(raw_index))
+
+        with open(raw_index, 'w') as raw_index_file:
+            raw_index_file.write('alpha\t{"efg": [9, 10]}\nhell\t{"ab": [2]}\nhello\t{"bcd": [3, 4], "abc": [1, 5]}\nzeta\t{"efg": [1, 3]}\n')
+
+        self.assertTrue(os.path.exists(raw_index))
+
+        # Should load the correct term data.
+        self.assertEqual(self.unhashed_micro.collect_results(['hello']), {'hello': {u'bcd': [3, 4], u'abc': [1, 5]}})
+        self.assertEqual(self.unhashed_micro.collect_results(['hell']), {'hell': {u'ab': [2]}})
+        self.assertEqual(self.unhashed_micro.collect_results(['zeta', 'alpha', 'foo']), {'alpha': {u'efg': [9, 10]}, 'foo': {}, 'zeta': {u'efg': [1, 3]}})
 
     def test_bm25_relevance(self):
         terms = ['hello']
