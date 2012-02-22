@@ -98,6 +98,23 @@ class MicrosearchTestCase(unittest.TestCase):
     def test_make_record(self):
         self.assertEqual(self.micro.make_record('hello', {"abc": [1, 2, 3]}), 'hello\t{"abc": [1, 2, 3]}\n')
 
+    def test_update_term_info(self):
+        orig = {
+            "abc": [1, 2, 3],
+            "ab": [2],
+        }
+        new = {
+            "abc": [2, 1, 5],
+            "bcd": [2, 3],
+            "ghi": [25],
+        }
+        self.assertEqual(self.micro.update_term_info(orig, new), {
+            'ab': [2],
+            'abc': [1, 2, 3, 5],
+            'bcd': [2, 3],
+            'ghi': [25]
+        })
+
     def test_save_segment(self):
         raw_index = self.micro.make_segment_name('hello')
         self.assertFalse(os.path.exists(raw_index))
@@ -203,6 +220,44 @@ class MicrosearchTestCase(unittest.TestCase):
 
         # Should load the correct document data.
         self.assertEqual(self.micro.load_document('hello'), {u'abc': [1, 5], u'bcd': [3, 4]})
+
+    def test_index(self):
+        # Check the exceptions.
+        self.assertRaises(AttributeError, self.micro.index, 'email_1', 'A raw doc.')
+        self.assertRaises(KeyError, self.micro.index, 'email_1', {'subject': 'A raw doc.'})
+
+        doc_1 = self.unhashed_micro.index('email_1', {'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh"})
+        doc_2 = self.unhashed_micro.index('email_2', {'text': 'Everyone,\n\nM-m-m-m-my red stapler has gone missing. H-h-has a-an-anyone seen it?\n\nMilton'})
+        doc_3 = self.unhashed_micro.index('email_3', {'text': "Peter,\n\nYeah, I'm going to need you to come in on Saturday. Don't forget those reports.\n\nLumbergh"})
+        doc_4 = self.unhashed_micro.index('email_4', {'text': 'How do you feel about becoming Management?\n\nThe Bobs'})
+
+        self.assertTrue(doc_1)
+        self.assertTrue(doc_2)
+        self.assertTrue(doc_3)
+        self.assertTrue(doc_4)
+
+        raw_doc_1 = self.unhashed_micro.make_document_name('email_1')
+        self.assertTrue(os.path.exists(raw_doc_1))
+        raw_doc_2 = self.unhashed_micro.make_document_name('email_2')
+        self.assertTrue(os.path.exists(raw_doc_2))
+        raw_doc_3 = self.unhashed_micro.make_document_name('email_3')
+        self.assertTrue(os.path.exists(raw_doc_3))
+        raw_doc_4 = self.unhashed_micro.make_document_name('email_4')
+        self.assertTrue(os.path.exists(raw_doc_4))
+
+        with open(raw_doc_1, 'r') as raw_doc_file_1:
+            self.assertEqual(raw_doc_file_1.read(), '{"text": "Peter,\\n\\nI\'m going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\\n\\nLumbergh"}')
+
+        raw_index = self.unhashed_micro.make_segment_name('peter')
+        self.assertTrue(os.path.exists(raw_index))
+
+        with open(raw_index, 'r') as raw_index_file_1:
+            lines = raw_index_file_1.readlines()
+
+            self.assertEqual(lines[0], 'a-a\t{"email_2": [8]}\n')
+            self.assertEqual(lines[1], 'a-an\t{"email_2": [8]}\n')
+            self.assertEqual(lines[19], 'desk\t{"email_1": [9, 16]}\n')
+            self.assertEqual(lines[74], 'report\t{"email_3": [12], "email_1": [7]}\n')
 
     def test_parse_query(self):
         self.assertEqual(self.micro.parse_query('Hello world!'), {

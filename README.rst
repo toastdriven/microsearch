@@ -19,6 +19,27 @@ Requirements
 * (Optional) unittest2 (Python 2.5 - for runnning the tests)
 
 
+Usage
+=====
+
+Example::
+
+    import microsearch
+
+    # Create an instance, pointing it to where the data should be stored.
+    ms = microsearch.Microsearch('/tmp/microsearch')
+
+    # Index some data.
+    ms.index('email_1', {'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh"})
+    ms.index('email_2', {'text': 'Everyone,\n\nM-m-m-m-my red stapler has gone missing. H-h-has a-an-anyone seen it?\n\nMilton'})
+    ms.index('email_3', {'text': "Peter,\n\nYeah, I'm going to need you to come in on Saturday. Don't forget those reports.\n\nLumbergh"})
+    ms.index('email_4', {'text': 'How do you feel about becoming Management?\n\nThe Bobs'})
+
+    # Search on it.
+    ms.search('Peter')
+    ms.search('tps report')
+
+
 Running Tests
 =============
 

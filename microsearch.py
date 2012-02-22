@@ -6,6 +6,31 @@ A small search library.
 
 Primarily intended to be a learning tool to teach the fundamentals of search.
 
+
+Usage
+-----
+
+Example::
+
+    import microsearch
+
+    # Create an instance, pointing it to where the data should be stored.
+    ms = microsearch.Microsearch('/tmp/microsearch')
+
+    # Index some data.
+    ms.index('email_1', {'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh"})
+    ms.index('email_2', {'text': 'Everyone,\n\nM-m-m-m-my red stapler has gone missing. H-h-has a-an-anyone seen it?\n\nMilton'})
+    ms.index('email_3', {'text': "Peter,\n\nYeah, I'm going to need you to come in on Saturday. Don't forget those reports.\n\nLumbergh"})
+    ms.index('email_4', {'text': 'How do you feel about becoming Management?\n\nThe Bobs'})
+
+    # Search on it.
+    ms.search('Peter')
+    ms.search('tps report')
+
+
+Documents
+---------
+
 Documents are dictionaries & look like::
 
     # Keys are field names.
@@ -15,6 +40,10 @@ Documents are dictionaries & look like::
         "text": "This is a blob of text. Nothing special about the text, just a typical document.",
         "created": "2012-02-18T20:19:00-0000",
     }
+
+
+The Index
+---------
 
 The (inverted) index itself (represented by the segment file bits), is also
 essentially a dictionary. The difference is that the index is term-based, unlike
@@ -132,7 +161,24 @@ class Microsearch(object):
     def make_record(self, term, term_info):
         return "{0}\t{1}\n".format(term, json.dumps(term_info))
 
-    def save_segment(self, term, term_info):
+    def update_term_info(self, orig_info, new_info):
+        # Updates are (sadly) not as simple as ``dict.update()``.
+        # Iterate through the keys (documents) & manually update.
+        for doc_id, positions in new_info.items():
+            if not doc_id in orig_info:
+                # Easy case; it's not there. Shunt it in wholesale.
+                orig_info[doc_id] = positions
+            else:
+                # Harder; it's there. Convert to sets, update then convert back
+                # to lists to accommodate ``json``.
+                orig_positions = set(orig_info.get(doc_id, []))
+                new_positions = set(positions)
+                orig_positions.update(new_positions)
+                orig_info[doc_id] = list(orig_positions)
+
+        return orig_info
+
+    def save_segment(self, term, term_info, update=False):
         seg_name = self.make_segment_name(term)
         new_seg_file = tempfile.NamedTemporaryFile(delete=False)
         written = False
@@ -152,8 +198,14 @@ class Microsearch(object):
                     new_seg_file.write(new_line)
                     written = True
                 elif seg_term == term:
-                    # Overwrite the line for the update.
-                    line = self.make_record(term, term_info)
+                    if not update:
+                        # Overwrite the line for the update.
+                        line = self.make_record(term, term_info)
+                    else:
+                        # Update the existing record.
+                        new_info = self.update_term_info(json.loads(seg_term_info), term_info)
+                        line = self.make_record(term, new_info)
+
                     written = True
 
                 # Either we haven't reached it alphabetically or we're well-past.
@@ -226,13 +278,16 @@ class Microsearch(object):
 
         # Make sure the document ID is a string.
         doc_id = str(doc_id)
-        save_document(doc_id, document)
+        self.save_document(doc_id, document)
 
         # Start analysis & indexing.
         tokens = self.make_tokens(document.get('text', ''))
         terms = self.make_ngrams(tokens)
 
-        # FIXME: Continue here.
+        for term, positions in terms.items():
+            self.save_segment(term, {doc_id: positions}, update=True)
+
+        return True
 
 
     # =========
