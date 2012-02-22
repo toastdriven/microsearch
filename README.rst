@@ -40,6 +40,41 @@ Example::
     ms.search('tps report')
 
 
+Shortcomings
+============
+
+This library is meant to help others learn. While it has full test coverage,
+it may not be suitable for production use. Reasons you may not want to use it
+in Real Code(tm):
+
+* No concurrency support
+
+  * Tries to work atomically with files
+  * But there are no locks
+  * So it's possible for writes to overlap between processes
+
+* Maybe thread-safe?
+
+  * Pretty much everything is on an instance
+  * But I haven't tested it extensively with threading
+
+* No support for deleting documents
+
+  * If an existing document changes or gets deleted, stale data will be left
+    in the index
+  * A workaround would be blowing away the index directory, moving the docs out
+    and reindexing them :/
+
+* Only n-grams are supported
+
+  * Because writing a full Porter or Snowball stemmer is beyond the needs
+    of this library
+
+* No clue on performance at scale
+
+  * This is a proof-of-concept & learning tool, *not* Lucene!
+
+
 Running Tests
 =============
 
