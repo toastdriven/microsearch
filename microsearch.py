@@ -43,7 +43,7 @@ import tempfile
 
 __author__ = 'Daniel Lindsley'
 __license__ = 'BSD'
-__version__ = (0, 4, 0)
+__version__ = (0, 5, 0)
 
 
 class Microsearch(object):
