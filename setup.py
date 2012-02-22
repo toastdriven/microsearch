@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name = "microsearch",
-    version = "0.8.0",
+    version = "0.9.0",
     description = "A small search library.",
     author = 'Daniel Lindsley',
     author_email = 'daniel@toastdriven.com',
@@ -11,7 +11,7 @@ setup(
         'microsearch'
     ],
     classifiers = [
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',
         'Operating System :: OS Independent',
