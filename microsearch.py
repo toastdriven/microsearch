@@ -91,6 +91,7 @@ class Microsearch(object):
         self.base_directory = base_directory
         self.index_path = os.path.join(self.base_directory, 'index')
         self.docs_path = os.path.join(self.base_directory, 'documents')
+        self.stats_path = os.path.join(self.base_directory, 'stats.json')
         self.setup()
 
     def setup(self):
@@ -104,6 +105,32 @@ class Microsearch(object):
             os.makedirs(self.docs_path)
 
         return True
+
+    def read_stats(self):
+        if not os.path.exists(self.stats_path):
+            return {
+                'version': '.'.join([str(bit) for bit in __version__]),
+                'total_docs': 0,
+            }
+
+        with open(self.stats_path, 'r') as stats_file:
+            return json.load(stats_file)
+
+    def write_stats(self, new_stats):
+        with open(self.stats_path, 'w') as stats_file:
+            json.dump(new_stats, stats_file)
+
+        return True
+
+    def increment_total_docs(self):
+        current_stats = self.read_stats()
+        current_stats.setdefault('total_docs', 0)
+        current_stats['total_docs'] += 1
+        self.write_stats(current_stats)
+
+    def get_total_docs(self):
+        current_stats = self.read_stats()
+        return int(current_stats.get('total_docs', 0))
 
 
     # ==============================

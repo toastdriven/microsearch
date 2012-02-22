@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import unittest
@@ -23,6 +24,50 @@ class MicrosearchTestCase(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.base, ignore_errors=True)
         super(MicrosearchTestCase, self).tearDown()
+
+    def test_read_stats(self):
+        # No file.
+        self.assertFalse(os.path.exists(self.micro.stats_path))
+        self.assertEqual(self.micro.read_stats(), {'total_docs': 0, 'version': '0.8.0'})
+
+        with open(self.micro.stats_path, 'w') as stats_file:
+            json.dump({
+                'version': '0.7.0'
+            }, stats_file)
+
+        self.assertEqual(self.micro.read_stats(), {'version': '0.7.0'})
+
+    def test_write_stats(self):
+        # No file.
+        self.assertFalse(os.path.exists(self.micro.stats_path))
+        self.assertTrue(self.micro.write_stats({
+            'version': '0.8.0',
+            'total_docs': 15,
+        }))
+        self.assertTrue(os.path.exists(self.micro.stats_path))
+
+        with open(self.micro.stats_path, 'r') as stats_file:
+            self.assertEqual(json.load(stats_file), {'total_docs': 15, 'version': '0.8.0'})
+
+    def test_increment_total_docs(self):
+        self.assertTrue(self.micro.write_stats({
+            'version': '0.8.0',
+            'total_docs': 15,
+        }))
+
+        self.micro.increment_total_docs()
+        self.micro.increment_total_docs()
+        self.micro.increment_total_docs()
+
+        self.assertEqual(self.micro.read_stats(), {'total_docs': 18, 'version': '0.8.0'})
+
+    def test_get_total_docs(self):
+        self.assertTrue(self.micro.write_stats({
+            'version': '0.8.0',
+            'total_docs': 12,
+        }))
+
+        self.assertEqual(self.micro.get_total_docs(), 12)
 
     def test_make_tokens(self):
         self.assertEqual(self.micro.make_tokens('Hello world'), ['hello', 'world'])
