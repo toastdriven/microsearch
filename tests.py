@@ -4,6 +4,13 @@ import unittest
 import microsearch
 
 
+class UnhashedMicrosearch(microsearch.Microsearch):
+    def hash_name(self, *args, **kwargs):
+        # For purposes of testing multiple terms, it's easier if they all
+        # go to the same file.
+        return 'abc'
+
+
 class MicrosearchTestCase(unittest.TestCase):
     def setUp(self):
         super(MicrosearchTestCase, self).setUp()
@@ -11,6 +18,7 @@ class MicrosearchTestCase(unittest.TestCase):
         shutil.rmtree(self.base, ignore_errors=True)
 
         self.micro = microsearch.Microsearch(self.base)
+        self.unhashed_micro = UnhashedMicrosearch(self.base)
 
     def tearDown(self):
         shutil.rmtree(self.base, ignore_errors=True)
@@ -57,17 +65,32 @@ class MicrosearchTestCase(unittest.TestCase):
             'really': [7],
         })
 
+    def test_hash_name(self):
+        self.assertEqual(self.micro.hash_name('hello'), '5d4140')
+        self.assertEqual(self.micro.hash_name('world'), '7d7930')
+        self.assertEqual(self.micro.hash_name('truly'), 'f499b3')
+        self.assertEqual(self.micro.hash_name('splendid'), '291e4e')
+        self.assertEqual(self.micro.hash_name('example'), '1a79a4')
+        self.assertEqual(self.micro.hash_name('some'), '03d59e')
+        self.assertEqual(self.micro.hash_name('tokens'), '25d718')
+        self.assertEqual(self.micro.hash_name('top'), 'b28354')
+        self.assertEqual(self.micro.hash_name('notch'), '9ce862')
+        self.assertEqual(self.micro.hash_name('really'), 'd2d92e')
+
+        self.assertEqual(self.micro.hash_name('notch', length=4), '9ce8')
+        self.assertEqual(self.micro.hash_name('really', length=8), 'd2d92eb9')
+
     def test_make_segment_name(self):
-        self.assertEqual(self.micro.make_segment_name('hello'), '5d4140.index')
-        self.assertEqual(self.micro.make_segment_name('world'), '7d7930.index')
-        self.assertEqual(self.micro.make_segment_name('truly'), 'f499b3.index')
-        self.assertEqual(self.micro.make_segment_name('splendid'), '291e4e.index')
-        self.assertEqual(self.micro.make_segment_name('example'), '1a79a4.index')
-        self.assertEqual(self.micro.make_segment_name('some'), '03d59e.index')
-        self.assertEqual(self.micro.make_segment_name('tokens'), '25d718.index')
-        self.assertEqual(self.micro.make_segment_name('top'), 'b28354.index')
-        self.assertEqual(self.micro.make_segment_name('notch'), '9ce862.index')
-        self.assertEqual(self.micro.make_segment_name('really'), 'd2d92e.index')
+        self.assertEqual(self.micro.make_segment_name('hello'), '/tmp/microsearch_tests/index/5d4140.index')
+        self.assertEqual(self.micro.make_segment_name('world'), '/tmp/microsearch_tests/index/7d7930.index')
+        self.assertEqual(self.micro.make_segment_name('truly'), '/tmp/microsearch_tests/index/f499b3.index')
+        self.assertEqual(self.micro.make_segment_name('splendid'), '/tmp/microsearch_tests/index/291e4e.index')
+        self.assertEqual(self.micro.make_segment_name('example'), '/tmp/microsearch_tests/index/1a79a4.index')
+        self.assertEqual(self.micro.make_segment_name('some'), '/tmp/microsearch_tests/index/03d59e.index')
+        self.assertEqual(self.micro.make_segment_name('tokens'), '/tmp/microsearch_tests/index/25d718.index')
+        self.assertEqual(self.micro.make_segment_name('top'), '/tmp/microsearch_tests/index/b28354.index')
+        self.assertEqual(self.micro.make_segment_name('notch'), '/tmp/microsearch_tests/index/9ce862.index')
+        self.assertEqual(self.micro.make_segment_name('really'), '/tmp/microsearch_tests/index/d2d92e.index')
 
     def test_parse_record(self):
         self.assertEqual(self.micro.parse_record('hello\t{"abc": [1, 2, 3]}\n'), ['hello', '{"abc": [1, 2, 3]}'])
@@ -76,10 +99,79 @@ class MicrosearchTestCase(unittest.TestCase):
         self.assertEqual(self.micro.make_record('hello', {"abc": [1, 2, 3]}), 'hello\t{"abc": [1, 2, 3]}\n')
 
     def test_save_segment(self):
-        pass
+        raw_index = self.micro.make_segment_name('hello')
+        self.assertFalse(os.path.exists(raw_index))
+
+        self.assertTrue(self.micro.save_segment('hello', {'abc': [1, 5]}))
+        self.assertTrue(os.path.exists(raw_index))
+
+        with open(raw_index, 'r') as raw_index_file:
+            self.assertEqual(raw_index_file.read(), 'hello\t{"abc": [1, 5]}\n')
+
+        self.assertTrue(self.micro.save_segment('hello', {'abc': [1, 5], 'bcd': [3, 4]}))
+        self.assertTrue(os.path.exists(raw_index))
+
+        with open(raw_index, 'r') as raw_index_file:
+            self.assertEqual(raw_index_file.read(), 'hello\t{"bcd": [3, 4], "abc": [1, 5]}\n')
+
+    def test_unhashed_save_segment(self):
+        raw_index = self.unhashed_micro.make_segment_name('hello')
+        self.assertEqual(raw_index, '/tmp/microsearch_tests/index/abc.index')
+        self.assertFalse(os.path.exists(raw_index))
+
+        self.assertTrue(self.unhashed_micro.save_segment('hello', {'abc': [1, 5]}))
+        self.assertTrue(os.path.exists(raw_index))
+
+        with open(raw_index, 'r') as raw_index_file:
+            self.assertEqual(raw_index_file.read(), 'hello\t{"abc": [1, 5]}\n')
+
+        self.assertTrue(self.unhashed_micro.save_segment('hello', {'abc': [1, 5], 'bcd': [3, 4]}))
+        self.assertTrue(self.unhashed_micro.save_segment('hell', {'ab': [2]}))
+        self.assertTrue(self.unhashed_micro.save_segment('alpha', {'efg': [9, 10]}))
+        self.assertTrue(self.unhashed_micro.save_segment('zeta', {'efg': [1, 3]}))
+        self.assertTrue(os.path.exists(raw_index))
+
+        with open(raw_index, 'r') as raw_index_file:
+            self.assertEqual(raw_index_file.read(), 'alpha\t{"efg": [9, 10]}\nhell\t{"ab": [2]}\nhello\t{"bcd": [3, 4], "abc": [1, 5]}\nzeta\t{"efg": [1, 3]}\n')
 
     def test_load_segment(self):
-        pass
+        raw_index = self.micro.make_segment_name('hello')
+        self.assertFalse(os.path.exists(raw_index))
+
+        # Shouldn't fail if it's not there.
+        self.assertEqual(self.micro.load_segment('hello'), {})
+
+        with open(raw_index, 'w') as raw_index_file:
+            raw_index_file.write('hello\t{"bcd": [3, 4], "abc": [1, 5]}\n')
+
+        self.assertTrue(os.path.exists(raw_index))
+
+        # Should load the correct term data.
+        self.assertEqual(self.micro.load_segment('hello'), {u'abc': [1, 5], u'bcd': [3, 4]})
+
+        # Won't hash to the same file & since we didn't put the data there,
+        # it fails to lookup.
+        self.assertEqual(self.micro.load_segment('binary'), {})
+
+    def test_unhashed_load_segment(self):
+        raw_index = self.unhashed_micro.make_segment_name('hello')
+        self.assertFalse(os.path.exists(raw_index))
+
+        # Shouldn't fail if it's not there.
+        self.assertEqual(self.unhashed_micro.load_segment('hello'), {})
+
+        with open(raw_index, 'w') as raw_index_file:
+            raw_index_file.write('alpha\t{"efg": [9, 10]}\nhell\t{"ab": [2]}\nhello\t{"bcd": [3, 4], "abc": [1, 5]}\nzeta\t{"efg": [1, 3]}\n')
+
+        self.assertTrue(os.path.exists(raw_index))
+
+        # Should load the correct term data.
+        self.assertEqual(self.unhashed_micro.load_segment('hello'), {u'abc': [1, 5], u'bcd': [3, 4]})
+        self.assertEqual(self.unhashed_micro.load_segment('hell'), {u'ab': [2]})
+        self.assertEqual(self.unhashed_micro.load_segment('zeta'), {"efg": [1, 3]})
+
+        # Term miss.
+        self.assertEqual(self.unhashed_micro.load_segment('binary'), {})
 
     def test_parse_query(self):
         self.assertEqual(self.micro.parse_query('Hello world!'), {
@@ -129,3 +221,7 @@ class MicrosearchTestCase(unittest.TestCase):
         total_docs = 175
         relevance = self.micro.bm25_relevance(terms, matching_docs, current_doc_occurances, total_docs)
         self.assertEqual("{:.2f}".format(relevance), '0.68', 'This fails on 2.X but should pass on Python 3.')
+
+
+if __name__ == '__main__':
+    unittest.main()

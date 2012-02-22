@@ -2,3 +2,5 @@
 *.pyc
 MANIFEST
 __pycache__
+htmlcov
+.coverage

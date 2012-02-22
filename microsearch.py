@@ -115,13 +115,16 @@ class Microsearch(object):
     # Segment Handling
     # ================
 
-    def make_segment_name(self, term, length=6):
+    def hash_name(self, term, length=6):
         # Make sure it's ASCII to appease the hashlib gods.
         term = term.encode('ascii', errors='ignore')
         # We hash & slice the term to get a small-ish number of fields
         # and good distribution between them.
         hashed = hashlib.md5(term).hexdigest()
-        return "{0}.index".format(hashed[:length])
+        return hashed[:length]
+
+    def make_segment_name(self, term):
+        return os.path.join(self.index_path, "{0}.index".format(self.hash_name(term)))
 
     def parse_record(self, line):
         return line.rstrip().split('\t', 1)
@@ -134,20 +137,31 @@ class Microsearch(object):
         new_seg_file = tempfile.NamedTemporaryFile(delete=False)
         written = False
 
+        if not os.path.exists(seg_name):
+            # If it doesn't exist, touch it.
+            with open(seg_name, 'w') as seg_file:
+                seg_file.write('')
+
         with open(seg_name, 'r') as seg_file:
             for line in seg_file:
-                seg_term, term_info = self.parse_record(line)
+                seg_term, seg_term_info = self.parse_record(line)
 
                 if not written and seg_term > term:
                     # We're at the alphabetical location & need to insert.
                     new_line = self.make_record(term, term_info)
                     new_seg_file.write(new_line)
+                    written = True
                 elif seg_term == term:
                     # Overwrite the line for the update.
                     line = self.make_record(term, term_info)
+                    written = True
 
                 # Either we haven't reached it alphabetically or we're well-past.
                 # Write the line.
+                new_seg_file.write(line)
+
+            if not written:
+                line = self.make_record(term, term_info)
                 new_seg_file.write(line)
 
         # Atomically move it into place.
