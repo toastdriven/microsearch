@@ -73,6 +73,12 @@ in Real Code(tm):
 * No clue on performance at scale
 
   * This is a proof-of-concept & learning tool, *not* Lucene!
+  * With a 2011 MBP on the first 1.2K docs of the Enron corpus:
+
+    * Indexing is pretty slow at ~1 document per second
+    * Search is pretty fast at ~0.007 sec per query
+    * RAM never exceeded 15Mb when indexing, 10Mb when searching
+    * Script in the source repo as ``enron_bench.py``.
 
 
 Running Tests

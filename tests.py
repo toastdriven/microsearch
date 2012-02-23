@@ -368,10 +368,10 @@ class MicrosearchTestCase(unittest.TestCase):
 
     def test_search(self):
         # No query, no results.
-        self.assertEqual(self.micro.search(''), [])
+        self.assertEqual(self.micro.search(''), {'total_hits': 0, 'results': []})
 
         # Query, but no documents.
-        self.assertEqual(self.micro.search('hello'), [])
+        self.assertEqual(self.micro.search('hello'), {'total_hits': 0, 'results': []})
 
         # Index some data.
         self.micro.index('email_1', {'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh"})
@@ -380,15 +380,71 @@ class MicrosearchTestCase(unittest.TestCase):
         self.micro.index('email_4', {'text': 'How do you feel about becoming Management?\n\nThe Bobs'})
 
         # Single term queries.
-        self.assertEqual(self.micro.search('peter'), [{'text': "Peter,\n\nYeah, I'm going to need you to come in on Saturday. Don't forget those reports.\n\nLumbergh", 'score': 0.5572567355483165, 'id': 'email_3'}, {'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh", 'score': 0.5572567355483165, 'id': 'email_1'}])
-        self.assertEqual(self.micro.search('desk'), [{'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh", 'score': 0.7691728487958707, 'id': 'email_1'}])
-        self.assertEqual(self.micro.search('you'), [{'text': "Peter,\n\nYeah, I'm going to need you to come in on Saturday. Don't forget those reports.\n\nLumbergh", 'score': 0.44274326445168355, 'id': 'email_3'}, {'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh", 'score': 0.44274326445168355, 'id': 'email_1'}, {'text': 'How do you feel about becoming Management?\n\nThe Bobs', 'score': 0.44274326445168355, 'id': 'email_4'}])
+        self.assertEqual(self.micro.search('peter'), {
+            'total_hits': 2,
+            'results': [
+                {
+                    'text': "Peter,\n\nYeah, I'm going to need you to come in on Saturday. Don't forget those reports.\n\nLumbergh",
+                    'score': 0.5572567355483165,
+                    'id': 'email_3'
+                },
+                {
+                    'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh",
+                    'score': 0.5572567355483165,
+                    'id': 'email_1'
+                }
+            ]
+        })
+        self.assertEqual(self.micro.search('desk'), {
+            'total_hits': 1,
+            'results': [
+                {
+                    'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh",
+                    'score': 0.7691728487958707,
+                    'id': 'email_1'
+                }
+            ]
+        })
+        self.assertEqual(self.micro.search('you'), {
+            'total_hits': 3,
+            'results': [
+                {
+                    'text': "Peter,\n\nYeah, I'm going to need you to come in on Saturday. Don't forget those reports.\n\nLumbergh",
+                    'score': 0.44274326445168355,
+                    'id': 'email_3'
+                },
+                {
+                    'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh",
+                    'score': 0.44274326445168355,
+                    'id': 'email_1'
+                },
+                {
+                    'text': 'How do you feel about becoming Management?\n\nThe Bobs',
+                    'score': 0.44274326445168355,
+                    'id': 'email_4'
+                }
+            ]
+        })
 
         # No matches:
-        self.assertEqual(self.micro.search('wunderkind'), [])
+        self.assertEqual(self.micro.search('wunderkind'), {'total_hits': 0, 'results': []})
 
         # Multiple term queries.
-        self.assertEqual(self.micro.search('peter desk'), [{'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh", 'score': 0.6420231808473381, 'id': 'email_1'}, {'text': "Peter,\n\nYeah, I'm going to need you to come in on Saturday. Don't forget those reports.\n\nLumbergh", 'score': 0.5343540413289899, 'id': 'email_3'}])
+        self.assertEqual(self.micro.search('peter desk'), {
+            'total_hits': 2,
+            'results': [
+                {
+                    'text': "Peter,\n\nI'm going to need those TPS reports on my desk first thing tomorrow! And clean up your desk!\n\nLumbergh",
+                    'score': 0.6420231808473381,
+                    'id': 'email_1'
+                },
+                {
+                    'text': "Peter,\n\nYeah, I'm going to need you to come in on Saturday. Don't forget those reports.\n\nLumbergh",
+                    'score': 0.5343540413289899,
+                    'id': 'email_3'
+                }
+            ]
+        })
 
 
 if __name__ == '__main__':

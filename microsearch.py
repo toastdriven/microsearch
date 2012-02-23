@@ -354,13 +354,18 @@ class Microsearch(object):
         return 0.5 + score / (2 * len(terms))
 
     def search(self, query, offset=0, limit=20):
+        results = {
+            'total_hits': 0,
+            'results': []
+        }
+
         if not len(query):
-            return []
+            return results
 
         total_docs = self.get_total_docs()
 
         if total_docs == 0:
-            return []
+            return results
 
         terms = self.parse_query(query)
         per_term_docs, per_doc_counts = self.collect_results(terms)
@@ -376,6 +381,7 @@ class Microsearch(object):
 
         # Sort based on score.
         sorted_results = sorted(scored_results, key=lambda res: res['score'], reverse=True)
+        results['total_hits'] = len(sorted_results)
 
         # Slice the results.
         sliced_results = sorted_results[offset:offset + limit]
@@ -384,6 +390,6 @@ class Microsearch(object):
         for res in sliced_results:
             doc_dict = self.load_document(res['id'])
             doc_dict.update(res)
-            final_results.append(doc_dict)
+            results['results'].append(doc_dict)
 
-        return final_results
+        return results
