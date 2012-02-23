@@ -10,6 +10,8 @@ Primarily intended to be a learning tool to teach the fundamentals of search.
 Useful for embedding into Python apps where you don't want/need something
 as complex as Lucene.
 
+Part of my (upcoming) 2012 PyCon talk - https://us.pycon.org/2012/schedule/presentation/66/
+
 
 Requirements
 ============
@@ -114,4 +116,4 @@ requirements are met.
 
 
 :author: Daniel Lindsley <daniel@toastdriven.com>
-:date: 2011/02/21
+:date: 2011/02/22
