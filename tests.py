@@ -28,7 +28,7 @@ class MicrosearchTestCase(unittest.TestCase):
     def test_read_stats(self):
         # No file.
         self.assertFalse(os.path.exists(self.micro.stats_path))
-        self.assertEqual(self.micro.read_stats(), {'total_docs': 0, 'version': '0.8.0'})
+        self.assertEqual(self.micro.read_stats(), {'total_docs': 0, 'version': '0.9.1'})
 
         with open(self.micro.stats_path, 'w') as stats_file:
             json.dump({
