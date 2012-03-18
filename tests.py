@@ -126,16 +126,17 @@ class MicrosearchTestCase(unittest.TestCase):
         self.assertEqual(self.micro.hash_name('really', length=8), 'd2d92eb9')
 
     def test_make_segment_name(self):
-        self.assertEqual(self.micro.make_segment_name('hello'), '/tmp/microsearch_tests/index/5d4140.index')
-        self.assertEqual(self.micro.make_segment_name('world'), '/tmp/microsearch_tests/index/7d7930.index')
-        self.assertEqual(self.micro.make_segment_name('truly'), '/tmp/microsearch_tests/index/f499b3.index')
-        self.assertEqual(self.micro.make_segment_name('splendid'), '/tmp/microsearch_tests/index/291e4e.index')
-        self.assertEqual(self.micro.make_segment_name('example'), '/tmp/microsearch_tests/index/1a79a4.index')
-        self.assertEqual(self.micro.make_segment_name('some'), '/tmp/microsearch_tests/index/03d59e.index')
-        self.assertEqual(self.micro.make_segment_name('tokens'), '/tmp/microsearch_tests/index/25d718.index')
-        self.assertEqual(self.micro.make_segment_name('top'), '/tmp/microsearch_tests/index/b28354.index')
-        self.assertEqual(self.micro.make_segment_name('notch'), '/tmp/microsearch_tests/index/9ce862.index')
-        self.assertEqual(self.micro.make_segment_name('really'), '/tmp/microsearch_tests/index/d2d92e.index')
+        path_prefix = os.path.join('/tmp', 'microsearch_tests', 'index')
+        self.assertEqual(self.micro.make_segment_name('hello'), os.path.join(path_prefix,'5d4140.index' ))
+        self.assertEqual(self.micro.make_segment_name('world'), os.path.join(path_prefix, '7d7930.index'))
+        self.assertEqual(self.micro.make_segment_name('truly'), os.path.join(path_prefix, 'f499b3.index'))
+        self.assertEqual(self.micro.make_segment_name('splendid'), os.path.join(path_prefix, '291e4e.index'))
+        self.assertEqual(self.micro.make_segment_name('example'), os.path.join(path_prefix, '1a79a4.index'))
+        self.assertEqual(self.micro.make_segment_name('some'), os.path.join(path_prefix, '03d59e.index'))
+        self.assertEqual(self.micro.make_segment_name('tokens'), os.path.join(path_prefix, '25d718.index'))
+        self.assertEqual(self.micro.make_segment_name('top'), os.path.join(path_prefix, 'b28354.index'))
+        self.assertEqual(self.micro.make_segment_name('notch'), os.path.join(path_prefix, '9ce862.index'))
+        self.assertEqual(self.micro.make_segment_name('really'), os.path.join(path_prefix, 'd2d92e.index'))
 
     def test_parse_record(self):
         self.assertEqual(self.micro.parse_record('hello\t{"abc": [1, 2, 3]}\n'), ['hello', '{"abc": [1, 2, 3]}'])
@@ -178,7 +179,8 @@ class MicrosearchTestCase(unittest.TestCase):
 
     def test_unhashed_save_segment(self):
         raw_index = self.unhashed_micro.make_segment_name('hello')
-        self.assertEqual(raw_index, '/tmp/microsearch_tests/index/abc.index')
+        goal_path = os.path.join('/tmp', 'microsearch_tests', 'index', 'abc.index')
+        self.assertEqual(raw_index, goal_path)
         self.assertFalse(os.path.exists(raw_index))
 
         self.assertTrue(self.unhashed_micro.save_segment('hello', {'abc': [1, 5]}))
@@ -236,12 +238,13 @@ class MicrosearchTestCase(unittest.TestCase):
         self.assertEqual(self.unhashed_micro.load_segment('binary'), {})
 
     def test_make_document_name(self):
-        self.assertEqual(self.micro.make_document_name('hello'), '/tmp/microsearch_tests/documents/5d4140/hello.json')
-        self.assertEqual(self.micro.make_document_name('world'), '/tmp/microsearch_tests/documents/7d7930/world.json')
-        self.assertEqual(self.micro.make_document_name('truly'), '/tmp/microsearch_tests/documents/f499b3/truly.json')
-        self.assertEqual(self.micro.make_document_name('splendid'), '/tmp/microsearch_tests/documents/291e4e/splendid.json')
-        self.assertEqual(self.micro.make_document_name('example'), '/tmp/microsearch_tests/documents/1a79a4/example.json')
-        self.assertEqual(self.micro.make_document_name('some'), '/tmp/microsearch_tests/documents/03d59e/some.json')
+        path_prefix = os.path.join('/tmp', 'microsearch_tests', 'documents')
+        self.assertEqual(self.micro.make_document_name('hello'), os.path.join(path_prefix,'5d4140', 'hello.json'))
+        self.assertEqual(self.micro.make_document_name('world'), os.path.join(path_prefix, '7d7930','world.json'))
+        self.assertEqual(self.micro.make_document_name('truly'), os.path.join(path_prefix, 'f499b3', 'truly.json'))
+        self.assertEqual(self.micro.make_document_name('splendid'), os.path.join(path_prefix, '291e4e', 'splendid.json'))
+        self.assertEqual(self.micro.make_document_name('example'), os.path.join(path_prefix, '1a79a4', 'example.json'))
+        self.assertEqual(self.micro.make_document_name('some'), os.path.join(path_prefix, '03d59e', 'some.json'))
 
     def test_save_document(self):
         raw_doc = self.micro.make_document_name('hello')

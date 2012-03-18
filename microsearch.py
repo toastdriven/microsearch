@@ -372,7 +372,11 @@ class Microsearch(object):
 
         # Atomically move it into place.
         new_seg_file.close()
-        os.rename(new_seg_file.name, seg_name)
+        try:
+            os.rename(new_seg_file.name, seg_name)
+        except OSError:
+            os.remove(seg_name)
+            os.rename(new_seg_file.name, seg_name)
         return True
 
     def load_segment(self, term):
